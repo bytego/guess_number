@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>星云链-猜数字</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.3.7/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="static/css/style.css">
+    <script src="https://cdn.staticfile.org/vue/2.2.6/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-router@3.0.1/dist/vue-router.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-ui@2.3.7/lib/index.js"></script>
+</head>
+
+<body>
+    <div id="app" v-show="visible" style="display: none;">
+        <nav id="nav">
+            <el-menu :default-active="activeIndex" class="el-menu left" mode="horizontal" @select="handleSelect">
+                <a href="/" class="logo">
+                    <img src="static/images/logo.png" alt="">
+                </a>
+                <el-menu-item index="home">
+                    <router-link :to="{path:'/'}">首页</router-link>
+                </el-menu-item>
+                <el-menu-item index="my">
+                    <router-link :to="{path:'/my'}">我的</router-link>
+                </el-menu-item>
+                <el-menu-item index="about">
+                    <router-link :to="{path:'/about'}">关于</router-link>
+                </el-menu-item>
+                <el-submenu index="chainnet">
+                    <template slot="title">{{chainStr}}</template>
+                    <el-menu-item index="mainnet" @click="changChain('mainnet')">主网</el-menu-item>
+                    <el-menu-item index="testnet" @click="changChain('testnet')">测试网</el-menu-item>
+                </el-submenu>
+            </el-menu>
+            <el-menu :default-active="activeIndex" class="el-menu right" mode="horizontal" @select="handleSelect">
+                <el-menu-item index="add">
+                    <router-link :to="{path:'/add'}">
+                        <el-button type="primary" size="small" icon="el-icon-plus" circle></el-button>
+                    </router-link>
+                </el-menu-item>
+                <el-menu-item index="nas-num">{{balance}} NAS</el-menu-item>
+                <el-submenu index="account">
+                    <template slot="title">账号</template>
+                    <el-menu-item index="setting">
+                        <router-link :to="{path:'/setting'}">设置</router-link>
+                    </el-menu-item>
+                </el-submenu>
+            </el-menu>
+        </nav>
+        <div class="container" id="container">
+
+
+            <el-dialog class="unlock-wallect" title="解锁钱包" :visible.sync="unlockWallectVisible" width="35%" :before-close="handleClose">
+
+                <el-upload class="upload-wallet" drag limit="1" action="" :on-change="walletFile" :auto-upload="false">
+                    <i class="el-icon-upload"></i>
+                    <div class="el-upload__text">将文件拖到此处，或
+                        <em>点击上传</em>
+                    </div>
+                    <div class="el-upload__tip" slot="tip">上传账户钱包文件以解锁账户</div>
+                </el-upload>
+
+                <div class="el-input" style="margin-top: 30px" v-show="needPwd">
+                    <input v-model="walletPasswd" type="password" placeholder="钱包已加密，请输入钱包密码！" autocomplete="off" class="el-input__inner">
+                    <span class="el-input__suffix" v-show="walletPasswd" @click="walletPasswd=''">
+                        <span class="el-input__suffix-inner">
+                            <i class="el-input__icon el-icon-circle-close el-input__clear"></i>
+                        </span>
+                    </span>
+                </div>
+
+                <span slot="footer" class="dialog-footer">
+                    <el-button @click="unlockWallectVisible = false">取 消</el-button>
+                    <el-button type="primary" :disabled="disabledUnlock" :loading="loadingAccountState" @click="onUnlockFile">{{unlockText}}</el-button>
+                </span>
+            </el-dialog>
+
+            <router-view></router-view>
+            <div class="footer">
+                <span>使用
+                    <a href="https://nebulas.io/" target="_blank">星云链</a> 驱动</span>&nbsp;|&nbsp;
+                <span>
+                    <a href="https://weibo.com/mzhangbo" target="_blank">联系作者</a>
+                </span>&nbsp;|&nbsp;
+                <span>
+                    <a href="https://incentive.nebulas.io/cn/signup.html?invite=YOr2Y" target="_blank">提交DAPP获得 100NAS 币</a>
+                </span>
+            </div>
+        </div>
+    </div>
+    <script type="text/x-template" id="home-tpl">
+        <div id="home" v-loading="loading" element-loading-text="拼命加载中">
+            <div v-if="currentPage == 'my'">
+                <el-tabs v-model="activeTab">
+                    <el-tab-pane label="我添加的" name="myPost"></el-tab-pane>
+                    <el-tab-pane label="我参与的" name="myPlay"></el-tab-pane>
+                </el-tabs>
+            </div>
+            <el-row :gutter="20" id="guessList">
+                <el-col :span="8" :xs="24" v-for="item in guessList">
+                    <router-link class="events-link guess-item" :to="{name:'guessDetail',params:{id:item.hash}}">
+                        <div class="events-box" :status="item|guessStatus">
+                            <div class="card-img">
+                                <img src="static/images/nebulas.png" class="">
+                                <em class="tag-upcoming" :class="[item.status]">{{item.statusText}}</em>
+                                <div class="withdrawGuss" v-if="currentPage == 'my' && activeTab=='myPost' && item.expired" @click.stop.prevent="withdrawGuess(item)">{{item|withdrawText}}</div>
+                            </div>
+                            <div class="text-content">
+                                <h3 class="" title="item.title">{{item.title?item.title:"快来猜一猜吧！"}}</h3>
+                                <!-- <p class="">{{item.tips}}</p> -->
+                                <!-- <p class=""><strong>2018年5月10日，波士顿，美国</strong></p> -->
+                                <div class="info">
+                                    <div class="item user">
+                                        <img src="static/images/avatar.png" alt="">
+                                        <span>{{item.user && item.user.nickName || item.author}}</span>
+                                    </div>
+                                    <div class="item">
+                                        <img src="static/images/users.png" alt=""> {{item.playUsers||0}}
+                                    </div>
+                                    <div class="item nas" :title="item.nas">
+                                        <img src="static/images/coin.png" alt="">
+                                        <span class="nas-val">{{item.nas}}</span>&nbsp;NAS
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </router-link>
+                </el-col>
+            </el-row>
+            <div style="text-align:center;" v-show="guessList.length">
+                <el-button round @click="loadmore" :loading="loadmoreYes">{{loadmoreText}}</el-button>
+            </div>
+        </div>
+    </script>
+    <script type="text/x-template" id="guess-detail-tpl">
+        <el-row :gutter="20" id="guess-detail" type="flex" justify="center" v-loading="loading" element-loading-text="拼命加载中">
+            <el-dialog title="参加游戏" :visible.sync="dialogVisible" width="30%">
+                <el-form :model="playGuess" status-icon :rules="playGuessRules" ref="playGuess">
+                    <el-form-item label="数字" prop="number">
+                        <el-input v-model="playGuess.number"></el-input>
+                    </el-form-item>
+                    <el-form-item label="密码" prop="passwd" v-if="guess.needPasswd">
+                        <el-input type="password" v-model="playGuess.passwd"></el-input>
+                    </el-form-item>
+                </el-form>
+                <span slot="footer" class="dialog-footer">
+                    <el-button @click="dialogVisible = false">取 消</el-button>
+                    <el-button type="primary" @click="submitForm('playGuess')">确 定</el-button>
+                </span>
+            </el-dialog>
+
+            <el-col :span="10" :xs="24" class="guess-item guess-detail">
+                <div class="events-box">
+                    <div class="card-img" :status="guess|guessStatus">
+                        <img src="static/images/nebulas.png" class="">
+                        <em class="tag-upcoming" :class="[guess.status]">{{guess.statusText}}</em>
+                    </div>
+                    <div class="text-content">
+                        <h3 class="">{{guess.title}}</h3>
+                        <p class="" v-if="guess.endTime">
+                            <strong>{{guess.endTime|dateFormat}} 结束</strong>
+                        </p>
+                        <div class="info">
+                            <div class="item user">
+                                <img src="static/images/avatar.png" alt="">
+                                <span>{{guess.user && guess.user.nickName || guess.author}}</span>
+                            </div>
+                            <div class="item">
+                                <img src="static/images/users.png" alt=""> {{guess.playUsers||0}}
+                            </div>
+                            <div class="item">
+                                <img src="static/images/coin.png" alt=""> {{guess.nas}} NAS
+                            </div>
+                        </div>
+                        <div style="text-align:center">
+                            <el-button type="warning" :disabled="guess.status !='normal'" :title="guess.statusText" round icon="el-icon-bell" @click="playGuessDialog">立即参加</el-button>
+                        </div>
+                        <div style="border-top: 1px #ccc dashed;margin: 15px 0px;"></div>
+                        <div class="tips pannel">
+                            <div class="head">提示</div>
+                            <div class="content">
+                                <p>
+                                    <el-tag type="success" v-if="guess.showDigits && guess.config">{{guess.config.digits}} 位数字</el-tag>
+                                    <el-tag type="warning" v-if="guess.maxTry">单人最多 {{guess.maxTry}} 次</el-tag>
+                                    <el-tag type="danger" v-if="guess.needPasswd">需要密码</el-tag>
+                                </p>
+                                {{guess.tips}}
+                            </div>
+                        </div>
+                        <div class="tips pannel">
+                            <div class="head">其他信息</div>
+                            <div class="content">
+                                <p>作者地址：{{guess.author}}</p>
+                                <p>奖励：{{guess.nas}} NAS</p>
+                                <p v-if="guess.created">创建时间：{{guess.created|dateFormat}}</p>
+                                <p>参与人数：{{guess.playUsers}}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+        </el-row>
+    </script>
+    <script type="text/x-template" id="setting-tpl">
+        <el-row :gutter="20" id="setting" type="flex" justify="center" v-loading="loading" element-loading-text="拼命加载中">
+            <el-col :span="10" :xs="24">
+                <el-form :model="setting" status-icon :rules="settingRules" ref="setting">
+                    <el-form-item label="昵称" prop="nickName">
+                        <el-input v-model="setting.nickName"></el-input>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="submitForm('setting')">保存</el-button>
+                    </el-form-item>
+                </el-form>
+            </el-col>
+        </el-row>
+    </script>
+    <script type="text/x-template" id="about-tpl">
+        <el-row :gutter="20" id="about" type="flex" justify="center" style="background:#FFF;padding-bottom:30px;">
+            <el-col :span="12" :xs="24">
+                <el-alert type="info" :closable="false">
+                    <p>此DAPP是一个猜数字小游戏，玩家可以在APP中创建游戏并设置奖励，也可以设置相关限制，如：输入密码，设置结束时间。</p>
+                    <p>如果某人猜对玩家设置的数字，奖励会通过智能合约将 95% 的奖励转账给玩家</p>
+                    <p>如果到期后未能有玩家猜中数字，可以在我的页面中取回发布时奖励的 95% NAS</p>
+                </el-alert>
+            </el-col>
+        </el-row>
+    </script>
+    <script type="text/x-template" id="add-tpl">
+        <el-row :gutter="20" id="add" type="flex" justify="center" style="background:#FFF;">
+
+            <el-col :span="10" :xs="24">
+                <el-form :model="form" status-icon :rules="rules" ref="form">
+                    <el-form-item label="标题" prop="title">
+                        <el-input v-model="form.title"></el-input>
+                    </el-form-item>
+                    <el-form-item label="数字" prop="number">
+                        <el-input v-model.number="form.number"></el-input>
+                    </el-form-item>
+                    <el-form-item label="奖励" prop="nas">
+                        <el-input v-model.number="form.nas">
+                            <template slot="append">NAS</template>
+                        </el-input>
+                    </el-form-item>
+                    <el-form-item label="最多猜" prop="maxTry">
+                        <el-input v-model.number="form.maxTry">
+                            <template slot="append">次</template>
+                        </el-input>
+                    </el-form-item>
+                    <el-form-item label="结束时间">
+                        <el-date-picker v-model="endDateTime" type="datetime" placeholder="结束时间">
+                        </el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="提示位数" prop="showDigits">
+                        <el-switch v-model="form.showDigits"></el-switch>
+                    </el-form-item>
+                    <el-form-item label="设置密码">
+                        <el-switch v-model="needPasswd"></el-switch>
+                    </el-form-item>
+                    <el-form-item label="密码" v-show="needPasswd" prop="passwd">
+                        <el-input v-model="form.passwd" type="password"></el-input>
+                    </el-form-item>
+                    <el-form-item label="提示语" prop="tips">
+                        <el-input type="textarea" v-model="form.tips"></el-input>
+                    </el-form-item>
+                    <el-form-item label="钱包地址" v-show="account">
+                        <el-input :value="account && account.getAddressString()" disabled></el-input>
+                    </el-form-item>
+                    <el-form-item label="钱包余额" v-show="account">
+                        <el-input :value="balance" disabled>
+                            <template slot="append">NAS</template>
+                        </el-input>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="submitForm('form')">立即创建</el-button>
+                        <!--<el-button>取消</el-button>-->
+                    </el-form-item>
+                </el-form>
+            </el-col>
+        </el-row>
+    </script>
+    <script src="dist/nebulas.js"></script>
+    <script src="static/js/index.js?_=201805081204"></script>
+
+</body>
+
+</html>
