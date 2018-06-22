@@ -4,8 +4,8 @@ var nebulas = require("nebulas"),
     Account = nebulas.Account,
     Transaction = nebulas.Transaction,
     Unit = nebulas.Unit,
-    Utils = nebulas.Utils,
-    nebPay = require("nebPay");
+    Utils = nebulas.Utils;
+    // nebPay = require("nebPay");
 
 
 var chainnetConfig = {
@@ -31,7 +31,7 @@ neb.setRequest(new HttpRequest(chainInfo.host));
 
 var nasApi = neb.api;
 
-Vue.prototype.nebPay = nebPay
+// Vue.prototype.nebPay = nebPay
 
 
 function getErrMsg(err) {
